@@ -1,0 +1,251 @@
+
+
+package api;
+
+
+
+
+import (
+    "os"
+    "fmt"
+    "log"
+    "net/http"
+    "io/ioutil"
+    "strings"
+    "net/url"
+    "regexp"
+    "os/exec"
+    "strconv"
+    "errors"
+    "time"
+    "encoding/xml"
+);
+
+
+
+
+type Video struct {
+    sID string
+    sAuthorID string
+    sAuthorName string
+    sTitle string
+    sDescription string
+    oUploaded time.Time
+    oPublished time.Time
+    oUpdated time.Time
+    oDuration time.Duration
+    aSources map[string]*Source
+}
+
+type Source struct {
+    sSourceTypeID string
+    sFileType string
+    sQuality string
+    iQuality int64
+    sUrl string
+}
+
+type XmlData struct {
+    XMLName xml.Name `xml:"feed"`
+    Entries []XmlVideo `xml:"entry"`
+    Links []XmlLink `xml:"link"`
+    ID string `xml:"id"`
+    Logo string `xml:"logo"`
+}
+
+type XmlLink struct {
+    Rel string `xml:"rel,attr"`
+    Href string `xml:"href,attr"`
+}
+
+type XmlVideo struct {
+    XMLName xml.Name `xml:"entry"`
+    ID string `xml:"media group>videoid,yt"`
+    AuthorID string `xml:"author>userId,yt"`
+    AuthorName string `xml:"author>name"`
+    Title string `xml:"title"`
+    Description string `xml:"media group>description,yt"`
+    Uploaded string `xml:"media group>uploaded,yt"`
+    Published string `xml:"published"`
+    Updated string `xml:"updated"`
+    Duration XmlDuration `xml:"media group>duration,yt"`
+}
+
+type XmlDuration struct {
+    Seconds string `xml:"seconds,attr"`
+}
+
+
+
+
+func aGetUserVideoIDs (sUserID string) []string {
+    
+    aVideoIDs := []string{};
+    
+    sNextApiCall := "http://gdata.youtube.com/feeds/api/users/" + sUserID + "/uploads?v=2";
+    for sNextApiCall != "" {
+        oData := XmlData{};
+        sPart, _ := sHttpGet(sNextApiCall);
+        xml.Unmarshal([]byte(sPart), &oData);
+        for _, oVideo := range oData.Entries {
+            aVideoID := strings.Split(oVideo.ID, "/");
+            sVideoID := aVideoID[len(aVideoID) - 1];
+            aVideoIDs = append(aVideoIDs, sVideoID);
+        }
+        sNextApiCall = "";
+        for _, oLink := range oData.Links {
+            if oLink.Rel == "next" {
+                sNextApiCall = oLink.Href;
+                break;
+            }
+        }
+    }
+    
+    return aVideoIDs;
+    
+}
+
+
+
+
+func oGetVideoData (sVideoID string) (Video, error) {
+    
+    sApiCall := "http://gdata.youtube.com/feeds/api/videos/" + sVideoID + "?v=2";
+    sData, err := sHttpGet(sApiCall);
+    if err != nil {
+        return Video{}, err;
+    }
+    
+    oData := XmlVideo{};
+    xml.Unmarshal([]byte(sData), &oData);
+    
+    oVideo := Video{
+        sID: oData.ID,
+        sAuthorID: oData.AuthorID,
+        sAuthorName: oData.AuthorName,
+        sTitle: oData.Title,
+        sDescription: oData.Description,
+        oUploaded: oParseYoutubeTime(oData.Uploaded),
+        oPublished: oParseYoutubeTime(oData.Published),
+        oUpdated: oParseYoutubeTime(oData.Updated),
+    };
+    
+    iDurationSeconds, _ := strconv.Atoi(oData.Duration.Seconds);
+    oVideo.oDuration = time.Duration(iDurationSeconds) * time.Second;
+    
+    oVideo.aSources, err = aGetVideoSources(oVideo.sID);
+    
+    return oVideo, err;
+    
+}
+
+
+
+
+func aGetVideoSources (sVideoID string) (map[string]*Source, error) {
+    
+    sApiCall := "http://www.youtube.com/get_video_info?&video_id=" + sVideoID;
+    sData, errHttp := sHttpGet(sApiCall);
+    
+    aData, _ := url.ParseQuery(sData);
+    
+    aSources := map[string]*Source{};
+    
+    if errHttp != nil {
+        return aSources, errHttp;
+    }
+    
+    if aData["status"][0] != "ok" {
+        errYoutube := errors.New("#" + aData["errorcode"][0] + ": " + aData["reason"][0]);
+        return aSources, errYoutube;
+    }
+    
+    sStreams := aData["url_encoded_fmt_stream_map"][0];
+    aStreams := strings.Split(sStreams, ",");
+    
+    for iS := 0; iS < len(aStreams); iS ++ {
+        
+        aStream, _ := url.ParseQuery(aStreams[iS]);
+        oSource := &Source{};
+        oRegEx := regexp.MustCompile("video\\/([^\\;]*)(;[\\S\\s]*)*$");
+        oSource.sFileType = oRegEx.FindStringSubmatch(aStream["type"][0])[1];
+        if oSource.sFileType == "x-flv" {
+            oSource.sFileType = "flv";
+        }
+        oSource.sQuality = aStream["quality"][0];
+        oSource.iQuality = iTranslateQuality(oSource.sQuality);
+        oSource.sSourceTypeID = aStream["itag"][0];
+        sDecodedUrl, _ := url.QueryUnescape(aStream["url"][0]);
+        oSource.sUrl = sDecodedUrl + "&signature=" + aStream["sig"][0];
+        aSources[oSource.sSourceTypeID] = oSource;
+        
+    }
+    
+    return aSources, nil;
+    
+}
+
+
+
+
+func oParseYoutubeTime (sYoutubeTime string) time.Time {
+    
+    aMonths := []time.Month{
+        time.January, time.February, time.March, time.April, time.May, time.June, 
+        time.July, time.August, time.September, time.October, time.November, time.December,
+    };
+    
+    oRegEx := regexp.MustCompile("(....)-(..)-(..)T(..)\\:(..)\\:(..)\\.(\\d*)Z");
+    aTimeData := oRegEx.FindStringSubmatch(sYoutubeTime);
+    iYear, _ := strconv.Atoi(aTimeData[1]);
+    iMonth, _ := strconv.Atoi(aTimeData[2]);
+    iDay, _ := strconv.Atoi(aTimeData[3]);
+    iHour, _ := strconv.Atoi(aTimeData[4]);
+    iMinute, _ := strconv.Atoi(aTimeData[5]);
+    iSecond, _ := strconv.Atoi(aTimeData[6]);
+    iOffset, _ := strconv.Atoi(aTimeData[7]);
+    oLocation := time.FixedZone("UTC", iOffset);
+    oTime := time.Date(iYear, aMonths[iMonth - 1], iDay, iHour, iMinute, iSecond, 0, oLocation);
+    
+    //fmt.Println(sYoutubeTime);
+    //fmt.Printf("%#v %#v %#v %#v %#v %#v \n", oTime.Year(), oTime.Month(), oTime.Day(), oTime.Hour(), oTime.Minute(), oTime.Second());
+    
+    return oTime;
+    
+}
+
+
+
+
+func iTranslateQuality (sQuality string) int64 {
+    
+    aMap := make(map[string]int64);
+    aMap["small"] = 240;
+    aMap["medium"] = 360;
+    aMap["large"] = 480;
+    aMap["hd720"] = 720;
+    aMap["hd1080"] = 1080;
+    iQuality := aMap[sQuality];
+    return iQuality;
+    
+}
+
+
+
+
+func sHttpGet (sUrl string) (string, error) {
+    
+    if !strings.Contains(sUrl, "http://") {
+        sUrl = "http://" + sUrl;
+    }
+    resp, err := http.Get(sUrl);
+    if err != nil {
+        return "", err;
+    }
+    defer resp.Body.Close();
+    body, err := ioutil.ReadAll(resp.Body);
+    return string(body), err;
+    
+}
+
+
