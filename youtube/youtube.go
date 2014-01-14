@@ -17,6 +17,7 @@ import(
     "errors"
     "time"
     "encoding/xml"
+    //"olli/base"
 );
 
 
@@ -43,7 +44,7 @@ type Source struct {
     sUrl string
 }
 
-type DownloadStatus struct {
+type ProcessStatus struct {
     sTimeLeft string
     nPercent float64
     bEnd bool
@@ -85,9 +86,13 @@ type XmlDuration struct {
 func YoutubeDownload (sVideoID string, iMaxQuality int, bMP3 bool, sTargetDir string) error {
     
     if bMP3 {
-        _, err := exec.LookPath("avconv");
-        if err != nil {
+        _, errAvconv := exec.LookPath("avconv");
+        if errAvconv != nil {
             return errors.New("the program 'avconv' is not installed. please install it and try again.");
+        }
+        _, errLame := exec.LookPath("lame");
+        if errLame != nil {
+            return errors.New("the program 'lame' is not installed. please install it and try again.");
         }
     }
     
@@ -108,22 +113,25 @@ func YoutubeDownload (sVideoID string, iMaxQuality int, bMP3 bool, sTargetDir st
     sTempDir := "/tmp";
     sTempFile := sTempDir + "/youtube_download" + "_" + sNonce + "_" + oVideo.sID;
     
-    cStatus := cDownload(sUrl, sTempFile);
+    fmt.Println("downloading");
+    cDownloadStatus := cDownload(sUrl, sTempFile);
     for {
-        oStatus := <-cStatus;
-        fmt.Printf("  %3v%%  %s       \r", oStatus.nPercent, oStatus.sTimeLeft);
-        if oStatus.bEnd {break}
+        oDownloadStatus := <-cDownloadStatus;
+        fmt.Printf("  %3v%%  %s       \r", oDownloadStatus.nPercent, oDownloadStatus.sTimeLeft);
+        if oDownloadStatus.bEnd {break}
     }
     fmt.Printf("\n");
     
     if bMP3 {
-        sTempFileMP3 := sTempFile + ".mp3";
         fmt.Println("converting to mp3");
-        oCommand := exec.Command("avconv", "-i", sTempFile, "-vn", "-qscale", "1", sTempFileMP3);
-        err := oCommand.Run();
-        if err != nil {
-            return err;
+        sTempFileMP3 := sTempFile + ".mp3";
+        cConvertStatus := cConvert(sTempFile, sTempFileMP3);
+        for {
+            oConvertStatus := <-cConvertStatus;
+            fmt.Printf("  %3v%%  %s       \r", oConvertStatus.nPercent, oConvertStatus.sTimeLeft);
+            if oConvertStatus.bEnd {break}
         }
+        fmt.Printf("\n");
         os.Remove(sTempFile);
         sTempFile = sTempFileMP3;
     }
@@ -178,6 +186,10 @@ func oGetVideoData (sVideoID string) (Video, error) {
     
     oData := XmlVideo{};
     xml.Unmarshal([]byte(sData), &oData);
+    
+    if oData.ID == "" {
+        return Video{}, errors.New("ERROR for " + sVideoID + ":\n" + sData);
+    }
     
     oVideo := Video{
         sID: oData.ID,
@@ -256,7 +268,7 @@ func (oVideo Video) aMakeDownloadData (iMaxQuality int) (sUrl, sFileName string)
     sUrl = oSource.sUrl;
     
     sAuthorTitle := "_[" + oVideo.sAuthorName + " - " + oVideo.sTitle + "]";
-    for _, sReplaceByUnderline := range []string{" ", "/", "|", ":"} {
+    for _, sReplaceByUnderline := range []string{" ", "/", "|", ":", "?"} {
         sAuthorTitle = strings.Replace(sAuthorTitle, sReplaceByUnderline, "_", -1);
     }
     sSourceTypeID := "_" + oSource.sSourceTypeID;
@@ -376,19 +388,21 @@ func sHttpGet (sUrl string) (string, error) {
 
 
 
-func cDownload (sUrl, sTargetFile string) (<-chan *DownloadStatus) {
+func cDownload (sUrl, sTargetFile string) (<-chan *ProcessStatus) {
     
-    cStatus := make(chan *DownloadStatus);
+    cStatus := make(chan *ProcessStatus);
     
     go func(){
+        
         _, err := exec.LookPath("wget");
         if err != nil {
             log.Fatal("the program 'wget' is not installed. please install it and try again.");
         }
+        
         oCommand := exec.Command("wget", sUrl, "-O", sTargetFile);
-        oStdoutStream, err := oCommand.StderrPipe();
+        oOutStream, err := oCommand.StderrPipe();
         if err != nil {log.Fatal(err);}
-        defer oStdoutStream.Close();
+        defer oOutStream.Close();
         err = oCommand.Start();
         if err != nil {log.Fatal(err);}
         var iChunk int64 = 64 * 1024;
@@ -397,7 +411,7 @@ func cDownload (sUrl, sTargetFile string) (<-chan *DownloadStatus) {
         sAll := "";
         o1S, _ := time.ParseDuration("1s");
         for {
-            iRead, err = oStdoutStream.Read(aData);
+            iRead, err = oOutStream.Read(aData);
             if err != nil {break}
             sAppend := fmt.Sprintf("%s", aData[:iRead]);
             sAll += sAppend;
@@ -408,7 +422,7 @@ func cDownload (sUrl, sTargetFile string) (<-chan *DownloadStatus) {
                 sPercent := aLastMatch[1];
                 sTimeLeft := aLastMatch[2];
                 nPercent, _ := strconv.ParseFloat(sPercent, 64);
-                cStatus <- & DownloadStatus {
+                cStatus <- & ProcessStatus {
                     nPercent: nPercent,
                     sTimeLeft: sTimeLeft,
                     bEnd: false,
@@ -417,11 +431,85 @@ func cDownload (sUrl, sTargetFile string) (<-chan *DownloadStatus) {
             }
             time.Sleep(o1S);
         }
-        cStatus <- & DownloadStatus {
+        cStatus <- & ProcessStatus {
             nPercent: 100,
             sTimeLeft: "0s",
             bEnd: true,
         };
+        
+    }();
+    
+    return cStatus;
+    
+}
+
+
+
+
+func cConvert (sSourceFile, sTargetFile string) (<-chan *ProcessStatus) {
+    
+    cStatus := make(chan *ProcessStatus);
+    
+    go func(){
+        
+        _, errAvconv := exec.LookPath("avconv");
+        if errAvconv != nil {
+            log.Fatal("the program 'avconv' is not installed. please install it and try again.");
+        }
+        _, errLame := exec.LookPath("lame");
+        if errLame != nil {
+            log.Fatal("the program 'lame' is not installed. please install it and try again.");
+        }
+        
+        sWavFile := sSourceFile + ".wav";
+        oCommandWAV := exec.Command("avconv", "-i", sSourceFile, "-vn", sWavFile);
+        errWAV := oCommandWAV.Run();
+        if errWAV != nil {
+            log.Fatal(errWAV);
+        }
+        
+        oCommandMP3 := exec.Command("lame", "-b", "320", "--cbr", sWavFile, sTargetFile);
+        oOutStream, errOut := oCommandMP3.StderrPipe();
+        if errOut != nil {log.Fatal(errOut);}
+        defer oOutStream.Close();
+        errStart := oCommandMP3.Start();
+        if errStart != nil {log.Fatal(errStart);}
+        
+        var iChunk int64 = 64 * 1024;
+        aData := make([]byte, iChunk);
+        var iRead int = 0;
+        sAll := "";
+        o1S, _ := time.ParseDuration("1s");
+        var err error;
+        for {
+            iRead, err = oOutStream.Read(aData);
+            if err != nil {break}
+            sAppend := fmt.Sprintf("%s", aData[:iRead]);
+            sAll += sAppend;
+            oRegEx := regexp.MustCompile(" +(\\d+\\/\\d+) +\\(([^\\)]+)\\%\\)[^\\n]+(\\d+\\:\\d+)[^\\n]+\\n\\-*(\\d+\\:\\d+)\\-+");
+            aMatches := oRegEx.FindAllStringSubmatch(sAll, -1);
+            if len(aMatches) > 0 {
+                aLastMatch := aMatches[len(aMatches) - 1];
+                sPercent := aLastMatch[2];
+                sTimeLeft := aLastMatch[3];
+                nPercent, _ := strconv.ParseFloat(sPercent, 64);
+                cStatus <- & ProcessStatus {
+                    nPercent: nPercent,
+                    sTimeLeft: sTimeLeft,
+                    bEnd: false,
+                };
+                sAll = "";
+            }
+            time.Sleep(o1S);
+        }
+        cStatus <- & ProcessStatus {
+            nPercent: 100,
+            sTimeLeft: "0s",
+            bEnd: true,
+        };
+        
+        os.Remove(sWavFile);
+        
     }();
     
     return cStatus;
