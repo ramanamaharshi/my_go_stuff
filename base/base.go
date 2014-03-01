@@ -7,6 +7,7 @@ import(
     "strings"
     "net/http"
     "io/ioutil"
+    //"kr/pretty"
 );
 
 func GetArgs (aAcceptedFlags map[string]int) map[string][]string {
@@ -64,6 +65,9 @@ func HttpGet (sUrl string) (string, error) {
 
 func Dump (mStuff interface{}) {
     fmt.Printf("%+v\n", mStuff);
+    //fmt.Printf("%# v\n", mStuff);
+    //fmt.Printf("%+v\n", pretty.Formatter(mStuff));
+    //fmt.Printf("%# v\n", pretty.Formatter(mStuff));
 }
 
 

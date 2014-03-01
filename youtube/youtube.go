@@ -16,8 +16,9 @@ import(
     "strconv"
     "errors"
     "time"
+    "math"
     "encoding/xml"
-    //"olli/base"
+    "olli/base"
 );
 
 
@@ -47,7 +48,6 @@ type Source struct {
 type ProcessStatus struct {
     sTimeLeft string
     nPercent float64
-    bEnd bool
 }
 
 type XmlData struct {
@@ -83,7 +83,7 @@ type XmlDuration struct {
 
 
 
-func YoutubeDownload (sVideoID string, iMaxQuality int, bMP3 bool, sTargetDir string) error {
+func YoutubeDownload (sVideoID string, iMaxQuality int, bMP3 bool, bGain bool, sTargetDir string) error {
     
     if bMP3 {
         _, errAvconv := exec.LookPath("avconv");
@@ -116,22 +116,37 @@ func YoutubeDownload (sVideoID string, iMaxQuality int, bMP3 bool, sTargetDir st
     fmt.Println("downloading");
     cDownloadStatus := cDownload(sUrl, sTempFile);
     for {
-        oDownloadStatus := <-cDownloadStatus;
+        oDownloadStatus, bDownloadStatusOpen := <-cDownloadStatus;
+        if !bDownloadStatusOpen {break}
         fmt.Printf("  %3v%%  %s       \r", oDownloadStatus.nPercent, oDownloadStatus.sTimeLeft);
-        if oDownloadStatus.bEnd {break}
     }
     fmt.Printf("\n");
     
     if bMP3 {
         fmt.Println("converting to mp3");
         sTempFileMP3 := sTempFile + ".mp3";
-        cConvertStatus := cConvert(sTempFile, sTempFileMP3);
+        cConvertStatus, cReplayGain := cConvert(sTempFile, sTempFileMP3, 0);
         for {
-            oConvertStatus := <-cConvertStatus;
+            oConvertStatus, bConvertStatusOpen := <-cConvertStatus;
+            if !bConvertStatusOpen {break}
             fmt.Printf("  %3v%%  %s       \r", oConvertStatus.nPercent, oConvertStatus.sTimeLeft);
-            if oConvertStatus.bEnd {break}
         }
         fmt.Printf("\n");
+        nReplayGain := <- cReplayGain;
+        fmt.Printf("ReplayGain: " + strconv.FormatFloat(nReplayGain, 'f', 4, 64) + "\n");
+        if (bGain) {
+            fmt.Println("applying gain");
+            os.Remove(sTempFileMP3);
+            cConvertStatus, cReplayGain := cConvert(sTempFile, sTempFileMP3, nReplayGain);
+            for {
+                oConvertStatus, bConvertStatusOpen := <-cConvertStatus;
+                if !bConvertStatusOpen {break}
+                fmt.Printf("  %3v%%  %s       \r", oConvertStatus.nPercent, oConvertStatus.sTimeLeft);
+            }
+            fmt.Printf("\n");
+            nReplayGain := <- cReplayGain;
+            fmt.Printf("ReplayGain: " + strconv.FormatFloat(nReplayGain, 'f', 4, 64) + "\n");
+        }
         os.Remove(sTempFile);
         sTempFile = sTempFileMP3;
     }
@@ -248,7 +263,7 @@ func aGetVideoSources (sVideoID string) (map[string]*Source, error) {
         oSource.iQuality = iTranslateQuality(oSource.sQuality);
         oSource.sSourceTypeID = aStream["itag"][0];
         sDecodedUrl, _ := url.QueryUnescape(aStream["url"][0]);
-        oSource.sUrl = sDecodedUrl + "&signature=" + aStream["sig"][0];
+        oSource.sUrl = sDecodedUrl;// + "&signature=" + aStream["sig"][0];
         aSources[oSource.sSourceTypeID] = oSource;
         
     }
@@ -408,15 +423,15 @@ func cDownload (sUrl, sTargetFile string) (<-chan *ProcessStatus) {
         var iChunk int64 = 64 * 1024;
         aData := make([]byte, iChunk);
         var iRead int = 0;
-        sAll := "";
-        o1S, _ := time.ParseDuration("1s");
+        sPart := "";
+        o1S := time.Second;//time.ParseDuration("1s");
         for {
             iRead, err = oOutStream.Read(aData);
             if err != nil {break}
             sAppend := fmt.Sprintf("%s", aData[:iRead]);
-            sAll += sAppend;
+            sPart += sAppend;
             oRegEx := regexp.MustCompile("(\\d\\d?)\\% [^ ]+ ([\\S\\d]*)\\n");
-            aMatches := oRegEx.FindAllStringSubmatch(sAll, -1);
+            aMatches := oRegEx.FindAllStringSubmatch(sPart, -1);
             if len(aMatches) > 0 {
                 aLastMatch := aMatches[len(aMatches) - 1];
                 sPercent := aLastMatch[1];
@@ -425,17 +440,16 @@ func cDownload (sUrl, sTargetFile string) (<-chan *ProcessStatus) {
                 cStatus <- & ProcessStatus {
                     nPercent: nPercent,
                     sTimeLeft: sTimeLeft,
-                    bEnd: false,
                 };
-                sAll = "";
+                sPart = "";
             }
             time.Sleep(o1S);
         }
         cStatus <- & ProcessStatus {
             nPercent: 100,
             sTimeLeft: "0s",
-            bEnd: true,
         };
+        close(cStatus);
         
     }();
     
@@ -446,9 +460,10 @@ func cDownload (sUrl, sTargetFile string) (<-chan *ProcessStatus) {
 
 
 
-func cConvert (sSourceFile, sTargetFile string) (<-chan *ProcessStatus) {
+func cConvert (sSourceFile, sTargetFile string, nGain float64) (<-chan *ProcessStatus, <-chan float64) {
     
     cStatus := make(chan *ProcessStatus);
+    cReplayGain := make(chan float64);
     
     go func(){
         
@@ -465,10 +480,17 @@ func cConvert (sSourceFile, sTargetFile string) (<-chan *ProcessStatus) {
         oCommandWAV := exec.Command("avconv", "-i", sSourceFile, "-vn", sWavFile);
         errWAV := oCommandWAV.Run();
         if errWAV != nil {
+            base.Dump("wav error:");
             log.Fatal(errWAV);
         }
         
-        oCommandMP3 := exec.Command("lame", "-b", "320", "--cbr", sWavFile, sTargetFile);
+        nScale := float64(1);
+        if nGain != 0 {
+            nScale = math.Pow(10, 0.05 * nGain);
+        }
+        sScale := strconv.FormatFloat(nScale, 'f', 4, 64);
+        
+        oCommandMP3 := exec.Command("lame", "-b", "320", "--cbr", "--scale", sScale, sWavFile, sTargetFile);
         oOutStream, errOut := oCommandMP3.StderrPipe();
         if errOut != nil {log.Fatal(errOut);}
         defer oOutStream.Close();
@@ -479,15 +501,17 @@ func cConvert (sSourceFile, sTargetFile string) (<-chan *ProcessStatus) {
         aData := make([]byte, iChunk);
         var iRead int = 0;
         sAll := "";
-        o1S, _ := time.ParseDuration("1s");
+        sPart := "";
+        o1S := time.Second;
         var err error;
         for {
             iRead, err = oOutStream.Read(aData);
             if err != nil {break}
             sAppend := fmt.Sprintf("%s", aData[:iRead]);
             sAll += sAppend;
-            oRegEx := regexp.MustCompile(" +(\\d+\\/\\d+) +\\(([^\\)]+)\\%\\)[^\\n]+(\\d+\\:\\d+)[^\\n]+\\n\\-*(\\d+\\:\\d+)\\-+");
-            aMatches := oRegEx.FindAllStringSubmatch(sAll, -1);
+            sPart += sAppend;
+            oRegExA := regexp.MustCompile(" +(\\d+\\/\\d+) +\\(([^\\)]+)\\%\\)[^\\n]+(\\d+\\:\\d+)[^\\n]+\\n\\-*(\\d+\\:\\d+)\\-+");
+            aMatches := oRegExA.FindAllStringSubmatch(sPart, -1);
             if len(aMatches) > 0 {
                 aLastMatch := aMatches[len(aMatches) - 1];
                 sPercent := aLastMatch[2];
@@ -496,23 +520,49 @@ func cConvert (sSourceFile, sTargetFile string) (<-chan *ProcessStatus) {
                 cStatus <- & ProcessStatus {
                     nPercent: nPercent,
                     sTimeLeft: sTimeLeft,
-                    bEnd: false,
                 };
-                sAll = "";
+                sPart = "";
             }
             time.Sleep(o1S);
         }
         cStatus <- & ProcessStatus {
             nPercent: 100,
             sTimeLeft: "0s",
-            bEnd: true,
         };
+        close(cStatus);
+        oRegExB := regexp.MustCompile("\nReplayGain: (.+)dB\n");
+        aMatches := oRegExB.FindStringSubmatch(sAll);
+        sReplayGain := "+0dB";
+        if (len(aMatches) > 1) {
+            sReplayGain = aMatches[1];
+        }
+        nReplayGain, _ := strconv.ParseFloat(sReplayGain, 64);
+        cReplayGain <- nReplayGain;
+        close(cReplayGain)
+        
+        /*if bGain {
+            nScale := math.Pow(10, 0.05 * nReplayGain);
+            sScale := strconv.FormatFloat(nScale, 'f', 4, 64);
+base.Dump(nReplayGain);
+base.Dump("scale:");
+base.Dump(nScale);
+base.Dump(sScale);
+            sTargetFileBeforeScale := sTargetFile + "_before_gain.mp3";
+            os.Rename(sTargetFile, sTargetFileBeforeScale);
+base.Dump([]string{"lame", "--scale", sScale, sTargetFileBeforeScale, sTargetFile});
+            oCommandGain := exec.Command("lame", "--scale", sScale, sTargetFileBeforeScale, sTargetFile);
+            errGain := oCommandGain.Run();
+            if errGain != nil {
+                base.Dump("gain error:");
+                log.Fatal(errGain);
+            }
+        }*/
         
         os.Remove(sWavFile);
         
     }();
     
-    return cStatus;
+    return cStatus, cReplayGain;
     
 }
 
@@ -549,6 +599,14 @@ func aFileSplit (sFile string) (sDir, sFileNameWithoutExtension, sExtension stri
     }
     
     return;
+    
+}
+
+
+
+func Dummy () {
+    
+    base.Dump("");
     
 }
 

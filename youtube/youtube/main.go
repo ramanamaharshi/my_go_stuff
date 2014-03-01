@@ -24,11 +24,20 @@ const VideoErrorFlag = "✖";
 
 func main () {
     
-    aArgs := base.GetArgs(map[string]int{"mp3": 0, "user_uploads": 1, "format": 1, "q": 1});
+    aArgs := base.GetArgs(map[string]int{"tel": 0, "mp3": 0, "gain": 0, "user_uploads": 1, "format": 1, "q": 1});
     sCurrentDir, _ := os.Getwd();
     
     sTargetDir := sCurrentDir;
     aVideoIDs := aArgs[""];
+    
+    _, bTel := aArgs["tel"];
+    _, bMP3 := aArgs["mp3"];
+    _, bGain := aArgs["gain"];
+    if bTel {
+        bMP3 = true;
+        bGain = true;
+        sTargetDir = "/aaa/downloads/telefon"
+    }
     
     bUseList := false;
     oList := &list.VideoList{};
@@ -49,7 +58,6 @@ func main () {
         aVideoIDs = oList.GetFreshVideos();
     }
     
-    _, bMP3 := aArgs["mp3"];
     var iMaxQuality = 999999;
     if _, bSet := aArgs["q"]; bSet {
         if len(aArgs["q"]) > 0 {
@@ -63,7 +71,7 @@ func main () {
     }
     
     for _, sVideoID := range aVideoIDs {
-        err := youtube.YoutubeDownload(sVideoID, iMaxQuality, bMP3, sTargetDir);
+        err := youtube.YoutubeDownload(sVideoID, iMaxQuality, bMP3, bGain, sTargetDir);
         fmt.Println(sVideoID + " fertig");
         if bUseList {
             if err == nil {
