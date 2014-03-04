@@ -9,7 +9,7 @@ import(
     "log"
     "time"
     //"math"
-    //"strconv"
+    "strconv"
 );
 
 
@@ -17,6 +17,7 @@ type Stream struct {
     nVolume float32
     oPendingSounds *pendingSounds
     cNewSounds chan *pendingSound
+    cSamplesWritten chan int
     iSamplesWritten int
     bKill bool
 }
@@ -28,7 +29,7 @@ type pendingSounds struct {
 
 
 type pendingSound struct {
-    aSamples []float32
+    aSamples *[]float32
     iStartSampleNr int
     oPrev *pendingSound
     oNext *pendingSound
@@ -39,7 +40,8 @@ func NewStream () *Stream {
     var oStream = &Stream{};
     oStream.nVolume = 1;
     oStream.oPendingSounds = &pendingSounds{};
-    oStream.cNewSounds = make(chan *pendingSound, 16);
+    oStream.cNewSounds = make(chan *pendingSound, 999999);
+    oStream.cSamplesWritten = make(chan int, 999999);
     return oStream;
 }
 
@@ -49,14 +51,14 @@ func (oStream *Stream) SetVolume (nVolume float32) {
 }
 
 
-func (oStream *Stream) PlayNow (aSound []float32) {
+func (oStream *Stream) PlayNow (aSound *[]float32) {
     
     oStream.Play(-1, aSound);
     
 }
 
 
-func (oStream *Stream) Play (iStartSampleNr int, aSound []float32) {
+func (oStream *Stream) Play (iStartSampleNr int, aSound *[]float32) {
     
     var oNewPendingSound = &pendingSound{
         aSamples: aSound,
@@ -100,18 +102,19 @@ func (oPendingSounds *pendingSounds) iCount () int {
 
 func (oPendingSounds *pendingSounds) vAdd (oPendingSound *pendingSound) {
     
+    var oPrev *pendingSound;
     var oNext = oPendingSounds.oFirstPendingSound;
     for oNext != nil && oNext.iStartSampleNr < oPendingSound.iStartSampleNr {
+        oPrev = oNext;
         oNext = oNext.oNext;
     }
+    oPendingSound.oPrev = oPrev;
+    oPendingSound.oNext = oNext;
+    if oPrev != nil {
+        oPrev.oNext = oPendingSound;
+    }
     if oNext != nil {
-        oPendingSound.oNext = oNext;
-        var oPrev = oNext.oPrev;
-        if oPrev != nil {
-            oPendingSound.oPrev = oPrev;
-            oPrev.oNext = oPendingSound;
-            oNext.oPrev = oPendingSound;
-        }
+        oNext.oPrev = oPendingSound;
     }
     if oPendingSound.oPrev == nil {
         oPendingSounds.oFirstPendingSound = oPendingSound;
@@ -152,17 +155,18 @@ func (oPendingSounds *pendingSounds) vWriteOnBuffer (iStartSample int, aBuffer [
             if iVon < 0 {
                 iVon = 0;
             }
-            var iBis = oPendingSound.iStartSampleNr - iStartSample + len(oPendingSound.aSamples);
-            if iBis > iStartSoundAt + len(oPendingSound.aSamples) {
-                iBis = iStartSoundAt + len(oPendingSound.aSamples);
+            var iSamples = len(*oPendingSound.aSamples);
+            var iBis = oPendingSound.iStartSampleNr - iStartSample + iSamples;
+            if iBis > iStartSoundAt + iSamples {
+                iBis = iStartSoundAt + iSamples;
             }
             if iBis > iBufferSize {
                 iBis = iBufferSize;
             }
             for iB := iVon; iB < iBis; iB ++ {
-                aBuffer[iB] += oPendingSound.aSamples[iStartSoundAt + iB];
+                aBuffer[iB] += (*oPendingSound.aSamples)[iStartSoundAt + iB];
             }
-            if iBis <= iVon {
+            if oPendingSound.iStartSampleNr + len(*oPendingSound.aSamples) < iStartSample {
                 oPendingSounds.vRemove(oPendingSound);
             }
         }
@@ -172,9 +176,10 @@ func (oPendingSounds *pendingSounds) vWriteOnBuffer (iStartSample int, aBuffer [
 }
 
 
-func (oStream *Stream) Start (iSampleRate int, oBufferDuration time.Duration) {
+func (oStream *Stream) Start (iSampleRate int, oBufferDuration time.Duration) <-chan int {
     
     go oStream.vLoop(iSampleRate, oBufferDuration);
+    return oStream.cSamplesWritten;
     
 }
 
@@ -224,6 +229,7 @@ func (oStream *Stream) vLoop (iSampleRate int, oBufferDuration time.Duration) {
         }
         oPulseStream.Write(aBuffer, pulsego.SEEK_RELATIVE);
         oStream.iSamplesWritten += iBufferSize;
+        oStream.cSamplesWritten <- oStream.iSamplesWritten;
         var oTimePassed = time.Now().Sub(oStartTime);
         var oTimeWritten = time.Duration(oStream.iSamplesWritten) * time.Second / time.Duration(iSampleRate);
         var oTimeDelta = oTimeWritten - oTimePassed;
@@ -240,6 +246,6 @@ func (oStream *Stream) vLoop (iSampleRate int, oBufferDuration time.Duration) {
 
 
 func Pretext () {
-    base.Dump("");
+    base.Dump(strconv.Itoa(1));
 }
 
