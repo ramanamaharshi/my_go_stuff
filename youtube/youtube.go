@@ -134,7 +134,7 @@ func YoutubeDownload (sVideoID string, iMaxQuality int, bMP3 bool, bGain bool, s
         fmt.Printf("\n");
         nReplayGain := <- cReplayGain;
         fmt.Printf("ReplayGain: " + strconv.FormatFloat(nReplayGain, 'f', 4, 64) + "\n");
-        if (bGain) {
+        if (bGain && nReplayGain > 4) {
             fmt.Println("applying gain");
             os.Remove(sTempFileMP3);
             cConvertStatus, cReplayGain := cConvert(sTempFile, sTempFileMP3, nReplayGain);
