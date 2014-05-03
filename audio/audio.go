@@ -64,7 +64,8 @@ func (oStream *Stream) Play (iStartSampleNr int, aSound *[]float32) {
         aSamples: aSound,
         iStartSampleNr: iStartSampleNr,
     };
-    oStream.cNewSounds <- oNewPendingSound;
+    oStream.oPendingSounds.vAdd(oNewPendingSound);
+    //oStream.cNewSounds <- oNewPendingSound;
     
 }
 
@@ -212,8 +213,8 @@ func (oStream *Stream) vLoop (iSampleRate int, oBufferDuration time.Duration) {
     defer oPulseStream.Dispose();
     oPulseStream.ConnectToSink();
     
-    oStream.iSamplesWritten = 0;
     var oStartTime = time.Now();
+    oStream.iSamplesWritten = 0;
     
     var iBufferSize = int(float64(iSampleRate) * oBufferDuration.Seconds());
     aBuffer := make([]float32, iBufferSize);

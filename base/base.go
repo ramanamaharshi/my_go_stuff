@@ -3,6 +3,7 @@ package base;
 
 import(
     "os"
+    "log"
     "fmt"
     "strings"
     "net/http"
@@ -47,7 +48,7 @@ func GetArgs (aAcceptedFlags map[string]int) map[string][]string {
 
 func HttpGet (sUrl string) (string, error) {
     
-    if !strings.Contains(sUrl, "http://") {
+    if !strings.Contains(sUrl, "http://") && !strings.Contains(sUrl, "https://") {
         sUrl = "http://" + sUrl;
     }
     resp, err := http.Get(sUrl);
@@ -57,6 +58,24 @@ func HttpGet (sUrl string) (string, error) {
     defer resp.Body.Close();
     body, err := ioutil.ReadAll(resp.Body);
     return string(body), err;
+    
+}
+
+
+
+
+func SimpleHttpGet (sUrl string) (string) {
+    
+    if !strings.Contains(sUrl, "http://") && !strings.Contains(sUrl, "https://") {
+        sUrl = "http://" + sUrl;
+    }
+    resp, err := http.Get(sUrl);
+    if err != nil {
+        log.Fatal("could not http get \"" + sUrl + "\"\n" + err.Error());
+    }
+    defer resp.Body.Close();
+    body, err := ioutil.ReadAll(resp.Body);
+    return string(body);
     
 }
 

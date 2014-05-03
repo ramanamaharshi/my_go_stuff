@@ -5,14 +5,12 @@ package main;
 
 import(
     "os"
-    "olli/base"
-    "olli/audio"
     "time"
     "math"
     "math/rand"
+    "olli/audio"
+    "olli/base"
 );
-
-
 
 
 func main () {
@@ -34,14 +32,26 @@ func main () {
     
     var oStartTime = time.Now();
     
-    //var iCooldownSamples = iSampleRate * 44 / 100;
-    //var oCooldownDuration = (1000 * time.Duration(iCooldownSamples) / time.Duration(iSampleRate)) * time.Millisecond;
+    var sDuration = "1h";
+    if len(aArgs[""]) > 0 {
+        sDuration = aArgs[""][0];
+    }
+    var oDuration, errParse = time.ParseDuration(sDuration);
+    if errParse != nil {
+        oDuration = time.Duration(60) * time.Minute;
+    }
+    base.Dump(oDuration);
     var iNextPlayStart = 0;
-base.Dump(time.Now());
+    var oLastLoggedTime = time.Time{};
     for {
         var iSamplesWritten = <- cSamplesWritten;
         if iSamplesWritten > iNextPlayStart - 5 * iSampleRate {
-            var aSound = SoundA(iSampleRate, time.Duration(2) * time.Second / time.Duration(4), 16, 32);
+            var oNow = time.Now();
+            if oNow.Sub(oLastLoggedTime) > (time.Duration(1) * time.Minute) {
+                base.Dump(time.Now());
+                oLastLoggedTime = oNow;
+            }
+            var aSound = SoundA(iSampleRate, time.Duration(2) * time.Second / time.Duration(8), 16, 32);
             for iKey := range(aSound) {
                 var nWavePart = float64(iKey) / float64(len(aSound));
                 var nVolume = 0.75 + 0.25 * float32(math.Sin(math.Pi * nWavePart));
@@ -55,40 +65,15 @@ base.Dump(time.Now());
             iNextPlayStart += len(aSound);
         }
         var oTimePassed = time.Now().Sub(oStartTime);
-        if oTimePassed > time.Duration(1) * time.Hour {
+        if oTimePassed > oDuration {
              break;
         }
-        //time.Sleep(time.Duration(50) * time.Millisecond);
+        time.Sleep(time.Duration(50) * time.Millisecond);
     }
-base.Dump(time.Now());
-    
-    /*oStream.Play(0, aSound);
-    oStream.Play(0, aSound);*/
-    
-    /*for {
-        //aSound = []float32{-1, -1, -1, -1, 1, 1, 1, 1, 1, 1, 1, 1, -1, -1, -1, -1};
-//base.Dump("play");
-        //oStream.PlayNow(aSound);
-        time.Sleep(time.Duration(500) * time.Millisecond);
-    }*/
     
     time.Sleep(time.Second);
     
 }
-
-
-
-/*func SoundB (iSampleRate int, oDuration time.Duration, iRepetitions int) {
-    
-    var oRand = rand.New(rand.NewSource(time.Now().Unix()));
-    var iSoundSamples = int(float64(iSampleRate) * oDuration.Seconds());
-    var aSound = make([]float32, iSoundSamples);
-    for iR := 0; iR < iRepetitions; iR ++ {
-        
-    }
-    
-}*/
-
 
 
 func SoundA (iSampleRate int, oDuration time.Duration, iMinFreq, iMaxFreq int) []float32 {
@@ -113,12 +98,7 @@ func SoundA (iSampleRate int, oDuration time.Duration, iMinFreq, iMaxFreq int) [
             } else {
                 aSound[iSoundAt + iWS] = -nVolume;
             }
-            //aSound[iSoundAt + iWS] = nVolume * float32(math.Sin(math.Pi * nWavePart));
         }
-        //nVolume /= 4;
-        /*if nVolume < 0.05 {
-            nVolume = 0.05;
-        }*/
         iSoundAt += iWaveSamples;
     }
     
