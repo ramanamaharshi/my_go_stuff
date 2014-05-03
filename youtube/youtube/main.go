@@ -24,11 +24,25 @@ const VideoErrorFlag = "✖";
 
 func main () {
     
-    aArgs := base.GetArgs(map[string]int{"tel": 0, "mp3": 0, "gain": 0, "user_uploads": 1, "format": 1, "q": 1});
+    aArgs := base.GetArgs(map[string]int{"?": 0, "h": 0, "q": 1, "tel": 0, "mp3": 0, "gain": 0, "user_uploads": 1, "format": 1});
     sCurrentDir, _ := os.Getwd();
     
     sTargetDir := sCurrentDir;
     aVideoIDs := aArgs[""];
+    
+    _, bHelp := aArgs["h"];
+    _, bQuestionMark := aArgs["?"];
+    if bHelp || bQuestionMark {
+        fmt.Println("this is for downloading youtube videos.");
+        fmt.Println("usage: youtube [OPTIONS] [YOUTUBE_IDS]");
+        fmt.Println("options:");
+        fmt.Println("-h, --help: this help page");
+        fmt.Println("-q [max_quality]: set maximum quality. standard youtube qualities are: 240, 320, 480, 720, 1080");
+        fmt.Println("-mp3: convert to mp3");
+        fmt.Println("-gain: make mp3 louder if very quiet");
+        fmt.Println("-user_uploads [user_id]: download all videos from a youtube user");
+        return;
+    }
     
     _, bTel := aArgs["tel"];
     _, bMP3 := aArgs["mp3"];
