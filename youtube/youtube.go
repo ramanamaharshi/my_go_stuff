@@ -45,6 +45,18 @@ type Source struct {
     sUrl string
 }
 
+type DownloadData struct {
+    Url string
+    Title string
+    Author string
+    VideoID string
+    Quality string
+    FileType string
+    SourceTypeID string
+    AuthorTitle string
+    FileName string
+}
+
 type ProcessStatus struct {
     sTimeLeft string
     nPercent float64
@@ -83,7 +95,7 @@ type XmlDuration struct {
 
 
 
-func YoutubeDownload (sVideoID string, iMaxQuality int, bMP3 bool, bGain bool, sTargetDir string) error {
+func YoutubeDownload (sVideoID string, iMaxQuality int, bMP3 bool, bGain bool, sTargetDir string, fFileNameMaker func(*DownloadData) string) error {
     
     if bMP3 {
         _, errAvconv := exec.LookPath("avconv");
@@ -100,7 +112,11 @@ func YoutubeDownload (sVideoID string, iMaxQuality int, bMP3 bool, bGain bool, s
     if errVideo != nil {
         return errVideo;
     }
-    sUrl, sFileName := oVideo.aMakeDownloadData(iMaxQuality);
+    oDownloadData := oVideo.oMakeDownloadData(iMaxQuality);
+    sFileName := oDownloadData.FileName;
+    sFileName = fFileNameMaker(&oDownloadData);
+    sUrl := oDownloadData.Url;
+    
     sTargetFileName := sFileName;
     if bMP3 {
         sTargetFileName = sReplaceExtension(sTargetFileName, "mp3");
@@ -275,23 +291,34 @@ func aGetVideoSources (sVideoID string) (map[string]*Source, error) {
 
 
 
-func (oVideo Video) aMakeDownloadData (iMaxQuality int) (sUrl, sFileName string) {
+func (oVideo Video) oMakeDownloadData (iMaxQuality int) DownloadData {
     
     sVideoID := oVideo.sID;
     oSource := oDetermineBestSource(oVideo.aSources, iMaxQuality);
     
-    sUrl = oSource.sUrl;
+    sUrl := oSource.sUrl;
     
-    sAuthorTitle := "_[" + oVideo.sAuthorName + " - " + oVideo.sTitle + "]";
-    for _, sReplaceByUnderline := range []string{" ", "/", "|", ":", "?"} {
-        sAuthorTitle = strings.Replace(sAuthorTitle, sReplaceByUnderline, "_", -1);
+    oReturn := DownloadData{
+        Url: sUrl,
+        VideoID: sVideoID,
+        Title: oVideo.sTitle,
+        Author: oVideo.sAuthorName,
+        Quality: fmt.Sprintf("%v", oSource.iQuality) + "p",
+        FileType: oSource.sFileType,
+        SourceTypeID: oSource.sSourceTypeID,
+        AuthorTitle: "",
+        FileName: "",
+    };
+    
+    oReturn.AuthorTitle = oReturn.Author + " - " + oReturn.Title;
+    for _, sReplaceWithUnderline := range []string{" ", "/", ":", "?"} {
+        oReturn.AuthorTitle = strings.Replace(oReturn.AuthorTitle, sReplaceWithUnderline, "_", -1);
     }
-    sSourceTypeID := "_" + oSource.sSourceTypeID;
-    sQuality := "_" + fmt.Sprintf("%v", oSource.iQuality) + "p";
-    sFileType := "." + oSource.sFileType;
-    sFileName = sVideoID + sAuthorTitle + sSourceTypeID + sQuality + sFileType;
     
-    return sUrl, sFileName;
+    oReturn.FileName = oReturn.VideoID + "_[" + oReturn.AuthorTitle + "]_";
+    oReturn.FileName += oReturn.SourceTypeID + "_" + oReturn.Quality + "." + oReturn.FileType;
+    
+    return oReturn;
     
 }
 

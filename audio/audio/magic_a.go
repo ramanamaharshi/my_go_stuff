@@ -7,6 +7,7 @@ import(
     "os"
     "olli/base"
     "olli/audio"
+    "olli/image"
     "time"
     "math"
     "math/rand"
@@ -45,6 +46,11 @@ func main () {
         oDuration = time.Duration(60) * time.Minute;
     }
 base.Dump(oDuration);
+    
+    var oImage = image.NewImage(20000, 200);
+    oImage.FillRect(0, 0, oImage.Width(), oImage.Height(), image.NewColor(255, 255, 255, 255));
+    oImage.DrawPoint(10, 10, image.NewColor(255, 0, 0, 255));
+    
     var iNextPlayStart = 0;
     for {
         var iSamplesWritten = <- cSamplesWritten;
@@ -54,12 +60,13 @@ base.Dump(time.Now());
             for iKey := range(aSound) {
                 var nWavePart = float64(iKey) / float64(len(aSound));
                 var nVolume = 0.75 + 0.25 * float32(math.Sin(math.Pi * nWavePart));
+                //nVolume = float32(1.0);
                 aSound[iKey] = nVolume * aSound[iKey];
             }
-            for iS := 0; iS < len(aSound); iS ++ {
-            }
+            // for iS := 0; iS < len(aSound); iS ++ {}
             if true || oRand.Intn(32) > 0 {
                 oStream.Play(iNextPlayStart, &aSound);
+                drawSound(oImage, &aSound, iNextPlayStart, 8);
             }
             iNextPlayStart += len(aSound);
         }
@@ -84,6 +91,19 @@ base.Dump(time.Now());
     
 }
 
+
+func drawSound (oImage *image.Image, aSound *[]float32, iSoundStart int, nCompression float32) {
+    if int(float32(iSoundStart) / nCompression) > oImage.Width() {return;}
+    for iSampleNr, nSampleValue := range(*aSound) {
+        iAt := iSoundStart + iSampleNr;
+        iImageAt := int(float32(iAt) / nCompression);
+        if (iImageAt >= oImage.Width()) {
+            oImage.SaveAsPNG("sound.png");
+            break;
+        }
+        oImage.DrawPoint(iImageAt, 100 + int(100.0 * nSampleValue), image.NewColor(0, 0, 0, 255));
+    }
+}
 
 
 /*func SoundB (iSampleRate int, oDuration time.Duration, iRepetitions int) {
@@ -111,7 +131,11 @@ func SoundA (iSampleRate int, oDuration time.Duration, iMinFreq, iMaxFreq int) [
     var iSoundAt = 0;
     for iSoundAt < iSoundSamples {
         var iWaveSamples = iMinWaveSamples + oRand.Intn(iMaxWaveSamples - iMinWaveSamples);
+        iWaveSamples = 888;
         if iWaveSamples > iSoundSamples - iSoundAt {
+            iWaveSamples = iSoundSamples - iSoundAt;
+        }
+        if (iSoundSamples - iSoundAt - iWaveSamples < iMinWaveSamples) {
             iWaveSamples = iSoundSamples - iSoundAt;
         }
         for iWS := 0; iWS < iWaveSamples; iWS ++ {
@@ -121,7 +145,7 @@ func SoundA (iSampleRate int, oDuration time.Duration, iMinFreq, iMaxFreq int) [
             } else {
                 aSound[iSoundAt + iWS] = -nVolume;
             }
-            //aSound[iSoundAt + iWS] = nVolume * float32(math.Sin(math.Pi * nWavePart));
+            aSound[iSoundAt + iWS] = nVolume * float32(math.Sin(2 * math.Pi * nWavePart));
         }
         //nVolume /= 4;
         /*if nVolume < 0.05 {

@@ -7,6 +7,7 @@ import(
     "os"
     "log"
     "fmt"
+    "strings"
     "strconv"
     "olli/base"
     "olli/youtube"
@@ -84,8 +85,21 @@ func main () {
         }
     }
     
+    fFileNameMaker := func (oDownloadData *youtube.DownloadData) string {
+        if bTel {
+            sAuthorTitle := oDownloadData.Author + " - " + oDownloadData.Title;
+            for _, sReplaceWithUnderline := range []string{" ", "/", ":", "?", "|", "\"", "'"} {
+                sAuthorTitle = strings.Replace(sAuthorTitle, sReplaceWithUnderline, "_", -1);
+            }
+            sFileName := oDownloadData.VideoID + "_[" + sAuthorTitle + "]_";
+            sFileName += oDownloadData.SourceTypeID + "_" + oDownloadData.Quality + "." + oDownloadData.FileType;
+            return sFileName;
+        }
+        return oDownloadData.FileName;
+    }
+    
     for _, sVideoID := range aVideoIDs {
-        err := youtube.YoutubeDownload(sVideoID, iMaxQuality, bMP3, bGain, sTargetDir);
+        err := youtube.YoutubeDownload(sVideoID, iMaxQuality, bMP3, bGain, sTargetDir, fFileNameMaker);
         fmt.Println(sVideoID + " fertig");
         if bUseList {
             if err == nil {
@@ -102,3 +116,6 @@ func main () {
     }
     
 }
+
+
+
