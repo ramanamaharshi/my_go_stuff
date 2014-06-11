@@ -77,15 +77,15 @@ type XmlLink struct {
 
 type XmlVideo struct {
     XMLName xml.Name `xml:"entry"`
-    ID string `xml:"media group>videoid,yt"`
+    ID string `xml:"group>videoid,yt"`
     AuthorID string `xml:"author>userId,yt"`
     AuthorName string `xml:"author>name"`
     Title string `xml:"title"`
-    Description string `xml:"media group>description,yt"`
-    Uploaded string `xml:"media group>uploaded,yt"`
+    Description string `xml:"group>description,yt"`
+    Uploaded string `xml:"group>uploaded,yt"`
     Published string `xml:"published"`
     Updated string `xml:"updated"`
-    Duration XmlDuration `xml:"media group>duration,yt"`
+    Duration XmlDuration `xml:"group>duration,yt"`
 }
 
 type XmlDuration struct {
@@ -218,6 +218,10 @@ func oGetVideoData (sVideoID string) (Video, error) {
     oData := XmlVideo{};
     xml.Unmarshal([]byte(sData), &oData);
     
+/*if true {
+    base.Dump(oData);
+    log.Fatal("ID = '" + oData.ID + "'");
+}*/
     if oData.ID == "" {
         return Video{}, errors.New("ERROR for " + sVideoID + ":\n" + sData);
     }
