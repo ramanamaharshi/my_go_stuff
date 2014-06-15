@@ -7,6 +7,7 @@ import(
     "os"
     "time"
     "math"
+    "strconv"
     "math/rand"
     "olli/audio"
     "olli/base"
@@ -15,13 +16,21 @@ import(
 
 func main () {
     
-    aArgs := base.GetArgs(map[string]int{});
+    aArgs := base.GetArgs(map[string]int{"v": 1});
     sCurrentDir, _ := os.Getwd();
     
     base.Dump(aArgs);
     base.Dump(sCurrentDir);
     
+    var nVolume float32 = 1.0;
+    if len(aArgs["v"]) > 0 {
+        var nVolume64, _ = strconv.ParseFloat(aArgs["v"][0], 32);
+        nVolume = float32(nVolume64);
+    }
+    base.Dump("nVolume = " + strconv.FormatFloat(float64(nVolume), 'f', 4, 32));
+    
     oStream := audio.NewStream();
+    oStream.SetVolume(nVolume);
     
     var iSampleRate = 44100;
     
