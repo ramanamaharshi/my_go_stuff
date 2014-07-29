@@ -18,7 +18,7 @@ func main () {
     _, bHelp := aArgs["?"];
     bHelp = bHelp || len(aArgs[""]) == 0;
     if bHelp {
-        base.Dump("usage: \npreg_match <regular expression> (<match nr>) < <file>\nor\nnpreg_match <regular expression> (<match nr>) <text>");
+        base.Dump("usage: \npreg_match [regular expression] ([match nr]) < [file]\nor\nnpreg_match [regular expression] ([match nr]) [text]");
         return;
     }
     sRegExp := aArgs[""][0];
