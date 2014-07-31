@@ -25,11 +25,17 @@ const VideoErrorFlag = "✖";
 
 func main () {
     
-    aArgs := base.GetArgs(map[string]int{"?": 0, "h": 0, "q": 1, "tel": 0, "mp3": 0, "gain": 0, "user_uploads": 1, "format": 1});
+    aArgs := base.GetArgs(map[string]int{"?": 0, "h": 0, "q": 1, "tel": 0, "mp3": 0, "gain": 0, "user_uploads": 1, "format": 1, "convert_only": 0});
     sCurrentDir, _ := os.Getwd();
     
     sTargetDir := sCurrentDir;
     aVideoIDs := aArgs[""];
+    for sKey, sID := range(aVideoIDs) {
+        aParams := aGetParams(sID);
+        if sParam, bSet := aParams["v"]; bSet {
+            aVideoIDs[sKey] = sParam;
+        }
+    }
     
     _, bHelp := aArgs["h"];
     _, bQuestionMark := aArgs["?"];
@@ -48,6 +54,12 @@ func main () {
     _, bTel := aArgs["tel"];
     _, bMP3 := aArgs["mp3"];
     _, bGain := aArgs["gain"];
+    _, bConvertOnly := aArgs["convert_only"];
+    
+    if bConvertOnly {
+        return;
+    }
+    
     if bTel {
         bMP3 = true;
         bGain = true;
@@ -114,6 +126,29 @@ func main () {
             }
         }
     }
+    
+}
+
+
+
+
+func aGetParams (sUrl string) map[string]string {
+    
+    aParams := map[string]string{};
+    aUrl := strings.Split(sUrl, "?");
+    if len(aUrl) > 1 {
+        sParams := aUrl[1];
+        aParamStrings := strings.Split(sParams, "&");
+        for _, sParamString := range(aParamStrings) {
+            aParamString := strings.Split(sParamString, "=");
+            sValue := "";
+            if len(aParamString) > 1 {
+                sValue = aParamString[1];
+            }
+            aParams[aParamString[0]] = sValue;
+        }
+    }
+    return aParams;
     
 }
 
