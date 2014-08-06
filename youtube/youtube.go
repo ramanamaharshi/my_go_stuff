@@ -315,7 +315,7 @@ func (oVideo Video) oMakeDownloadData (iMaxQuality int) DownloadData {
     };
     
     oReturn.AuthorTitle = oReturn.Author + " - " + oReturn.Title;
-    for _, sReplaceWithUnderline := range []string{" ", "/", ":", "?", "'", "\""} {
+    for _, sReplaceWithUnderline := range []string{" ", "/", ":", "?", "'", "\"", "|"} {
         oReturn.AuthorTitle = strings.Replace(oReturn.AuthorTitle, sReplaceWithUnderline, "_", -1);
     }
     
