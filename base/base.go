@@ -1,5 +1,11 @@
 
+
+
+
 package base;
+
+
+
 
 import(
     "os"
@@ -8,8 +14,10 @@ import(
     "strings"
     "net/http"
     "io/ioutil"
-    //"kr/pretty"
 );
+
+
+
 
 func GetArgs (aAcceptedFlags map[string]int) map[string][]string {
     
@@ -40,6 +48,26 @@ func GetArgs (aAcceptedFlags map[string]int) map[string][]string {
     }
     
     return aReturn;
+    
+}
+
+
+
+
+func FileExists (sFile string) bool {
+    
+    _,err := os.Stat(sFile);
+    return err == nil;
+    
+}
+
+
+
+
+func IsDirectory (sFile string) bool {
+    
+    oInfo,_ := os.Stat(sFile);
+    return oInfo.IsDir();
     
 }
 
@@ -83,10 +111,9 @@ func SimpleHttpGet (sUrl string) (string) {
 
 
 func Dump (mStuff interface{}) {
+    
     fmt.Printf("%+v\n", mStuff);
-    //fmt.Printf("%# v\n", mStuff);
-    //fmt.Printf("%+v\n", pretty.Formatter(mStuff));
-    //fmt.Printf("%# v\n", pretty.Formatter(mStuff));
+    
 }
 
 
