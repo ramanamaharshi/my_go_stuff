@@ -63,7 +63,7 @@ func main () {
 	}
 	base.Dump(aFiles);
 	
-	rxF := regexp.MustCompile("\n[^\n]*\\S+ +(\\S+) +\\([^\\)\\;]+\\) {");
+	rxF := regexp.MustCompile("\n[^\n]*\\S+ +(\\S+) +\\([^\\)\\;]*\\) {");
 	rxAuto := regexp.MustCompile("\n///#///\n[\\s\\S]+\n///#///\n");
 	aRXSFH := []*regexp.Regexp{/*regexp.MustCompile("^\n *static ")*/};
 	aRXSFF := []*regexp.Regexp{regexp.MustCompile("^_")};
