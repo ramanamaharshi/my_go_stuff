@@ -63,7 +63,10 @@ func main () {
     if bTel {
         bMP3 = true;
         bGain = true;
-        sTargetDir = "/aaa/downloads/telefon"
+		sTargetDir = "/aaa/downloads/telefon";
+		if _, err := os.Stat(sTargetDir); os.IsNotExist(err) {
+			sTargetDir = "/zzz/cache/telefon";
+		}
     }
     
     bUseList := false;
