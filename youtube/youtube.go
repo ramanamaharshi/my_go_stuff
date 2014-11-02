@@ -273,6 +273,9 @@ func aGetVideoSources (sVideoID string) (map[string]*Source, error) {
     for iS := 0; iS < len(aStreams); iS ++ {
         
         aStream, _ := url.ParseQuery(aStreams[iS]);
+        if len(aStream["stereo3d"]) > 0 {
+            continue;
+        }
         oSource := &Source{};
         oRegEx := regexp.MustCompile("video\\/([^\\;]*)(;[\\S\\s]*)*$");
         oSource.sFileType = oRegEx.FindStringSubmatch(aStream["type"][0])[1];
@@ -285,7 +288,6 @@ func aGetVideoSources (sVideoID string) (map[string]*Source, error) {
         sDecodedUrl, _ := url.QueryUnescape(aStream["url"][0]);
         oSource.sUrl = sDecodedUrl;// + "&signature=" + aStream["sig"][0];
         aSources[oSource.sSourceTypeID] = oSource;
-        
     }
     
     return aSources, nil;
