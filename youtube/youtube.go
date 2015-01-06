@@ -100,7 +100,7 @@ func YoutubeDownload (sVideoID string, iMaxQuality int, bMP3 bool, bGain bool, s
     if bMP3 {
         _, errAvconv := exec.LookPath("avconv");
         if errAvconv != nil {
-            return errors.New("the program 'avconv' is not installed. please install it and try again.");
+            return errors.New("the program 'avconv' is not installed. please install it (package libav-tools) and try again.");
         }
         _, errLame := exec.LookPath("lame");
         if errLame != nil {
@@ -150,7 +150,7 @@ func YoutubeDownload (sVideoID string, iMaxQuality int, bMP3 bool, bGain bool, s
         fmt.Printf("\n");
         nReplayGain := <- cReplayGain;
         fmt.Printf("ReplayGain: " + strconv.FormatFloat(nReplayGain, 'f', 4, 64) + "\n");
-        if (bGain && nReplayGain > 4) {
+        if (bGain && nReplayGain > 0) {
             fmt.Println("applying gain");
             os.Remove(sTempFileMP3);
             cConvertStatus, cReplayGain := cConvert(sTempFile, sTempFileMP3, nReplayGain);
@@ -573,23 +573,23 @@ func cConvert (sSourceFile, sTargetFile string, nGain float64) (<-chan *ProcessS
         cReplayGain <- nReplayGain;
         close(cReplayGain)
         
-        /*if bGain {
-            nScale := math.Pow(10, 0.05 * nReplayGain);
-            sScale := strconv.FormatFloat(nScale, 'f', 4, 64);
-base.Dump(nReplayGain);
-base.Dump("scale:");
-base.Dump(nScale);
-base.Dump(sScale);
-            sTargetFileBeforeScale := sTargetFile + "_before_gain.mp3";
-            os.Rename(sTargetFile, sTargetFileBeforeScale);
-base.Dump([]string{"lame", "--scale", sScale, sTargetFileBeforeScale, sTargetFile});
-            oCommandGain := exec.Command("lame", "--scale", sScale, sTargetFileBeforeScale, sTargetFile);
-            errGain := oCommandGain.Run();
-            if errGain != nil {
-                base.Dump("gain error:");
-                log.Fatal(errGain);
-            }
-        }*/
+//        if bGain {
+//            nScale := math.Pow(10, 0.05 * nReplayGain);
+//            sScale := strconv.FormatFloat(nScale, 'f', 4, 64);
+//base.Dump(nReplayGain);
+//base.Dump("scale:");
+//base.Dump(nScale);
+//base.Dump(sScale);
+//            sTargetFileBeforeScale := sTargetFile + "_before_gain.mp3";
+//            os.Rename(sTargetFile, sTargetFileBeforeScale);
+////base.Dump([]string{"lame", "--scale", sScale, sTargetFileBeforeScale, sTargetFile});
+//            oCommandGain := exec.Command("lame", "--scale", sScale, sTargetFileBeforeScale, sTargetFile);
+//            errGain := oCommandGain.Run();
+//            if errGain != nil {
+//                base.Dump("gain error:");
+//                log.Fatal(errGain);
+//            }
+//        }
         
         os.Remove(sWavFile);
         
