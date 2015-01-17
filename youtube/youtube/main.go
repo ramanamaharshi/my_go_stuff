@@ -65,7 +65,7 @@ func main () {
         bGain = true;
 		sTargetDir = "/aaa/downloads/telefon";
 		if _, err := os.Stat(sTargetDir); os.IsNotExist(err) {
-			sTargetDir = "/zzz/cache/telefon";
+			sTargetDir = "/aaa/cache/telefon";
 		}
     }
     
