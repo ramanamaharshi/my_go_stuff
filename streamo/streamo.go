@@ -21,6 +21,8 @@ import "strconv";
 
 func Dummy () {
 	
+	_ = strconv.Itoa(0);
+	_ = strings.Index("", "");
 	log.Println("");
 	fmt.Printf("");
 	base.Dump("");
@@ -34,17 +36,25 @@ func main () {
 	
 	aArgs := base.GetArgs(map[string]int{"?": 0, "h": 0});
 	
+	_, bHelp := aArgs["h"];
+	_, bQuestionMark := aArgs["?"];
+	if bHelp || bQuestionMark {
+		fmt.Println("this tool is for grepping when there are no line breaks");
+		fmt.Println("usage: streamo [regular expression] <[output per match (default='\\0')]>");
+		fmt.Println("options:");
+		fmt.Println("-?, -h: this help page");
+	}
+	
 	sRegExp := aArgs[""][0];
 	
-	iOnlyMatchNr := -1;
+	sOutputTemplate := "\\0";
 	if len(aArgs[""]) > 1 {
-		iOnlyMatchNr64, _ := strconv.ParseInt(aArgs[""][1], 10, 64);
-		iOnlyMatchNr = int(iOnlyMatchNr64);
+		sOutputTemplate = aArgs[""][1];
 	}
 	
 	oRegExA := regexp.MustCompile(sRegExp);
 	
-	var iChunk int64 = 4;
+	var iChunk int64 = 1;
 	aData := make([]byte, iChunk);
 	var iRead int = 0;
 	sAll := "";
@@ -63,11 +73,11 @@ func main () {
 		if len(aMatches) > 0 {
 			sPart = "";
 			aLastMatch := aMatches[len(aMatches) - 1];
-			if iOnlyMatchNr == -1 {
-				fmt.Print(strings.Join(aLastMatch, " ") + "\n");
-			} else {
-				fmt.Print(aLastMatch[iOnlyMatchNr] + "\n");
+			sOutput := sOutputTemplate;
+			for iNr , sValue := range aLastMatch {
+				sOutput = strings.Replace(sOutput, "\\" + strconv.Itoa(iNr), sValue, -1);
 			}
+			fmt.Print(sOutput + "\n");
 		}
 	}
 	
