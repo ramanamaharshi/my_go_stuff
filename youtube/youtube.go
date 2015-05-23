@@ -218,6 +218,9 @@ func oGetVideoData (sVideoID string) (Video, error) {
     oData := XmlVideo{};
     xml.Unmarshal([]byte(sData), &oData);
     
+base.Dump(sApiCall);
+base.Dump(sData);
+base.Dump(oData);
 /*if true {
     base.Dump(oData);
     log.Fatal("ID = '" + oData.ID + "'");
