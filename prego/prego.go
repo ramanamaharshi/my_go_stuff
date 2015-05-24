@@ -86,7 +86,7 @@ func main () {
 				if bReplace {
 					fmt.Print(oRegExA.ReplaceAllLiteralString(sPart, sOutput));
 				} else {
-					fmt.Print(sOutput + "\n");
+					fmt.Print("\\[\\033[7m\\]" + sOutput + "\\[\\033[0m\\]" + "\n");
 				}
 			}
 			sPart = "";
