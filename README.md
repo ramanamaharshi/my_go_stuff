@@ -1,4 +1,5 @@
 go_youtube_downloader
 =====================
 
-a youtube downloader in golang for linux (requires wget)
+general golang stuff
+The youtube doesnloader doesn't work anymore since YouTube ditched api-v2.
