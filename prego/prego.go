@@ -84,21 +84,17 @@ func main () {
 			
 			aMatchIndicesNext := oRegExA.FindAllStringSubmatchIndex(sPart + sNewLetter, -1);
 			
-			bOutput := false;
+			bOutput := true;
 			
-			if e != nil {
-				
-				bOutput = true;
-				
-			} else {
+			if e == nil {
 				
 				if len(aMatchIndicesNext) > 0 {
 					
 					aLastMatchIndicesNext := aMatchIndicesNext[len(aMatchIndicesNext) - 1];
 					
-					if aLastMatchIndices[0] != aLastMatchIndicesNext[0] || aLastMatchIndices[1] == aLastMatchIndices[1]{
+					if aLastMatchIndices[0] == aLastMatchIndicesNext[0] && aLastMatchIndices[1] != aLastMatchIndicesNext[1] {
 						
-						bOutput = true;
+						bOutput = false;
 						
 					}
 					
@@ -126,68 +122,6 @@ func main () {
 		if e != nil { break; }
 		
 		sPart += sNewLetter;
-		//base.Dump(sPart);
-		
-		/*
-		aLastMatch := []string{};
-		aLastMatchIndices := []int{};
-		bOutputPrevious := false;
-		
-		if e == nil {
-			
-			sPart += sChunk;
-			
-			aMatches := oRegExA.FindAllStringSubmatch(sPart, -1);
-			aMatchIndices := oRegExA.FindAllStringSubmatchIndex(sPart, -1);
-			
-			if len(aMatchIndices) == 0 {
-				bOutputPrevious = true;
-			} else {
-				aLastMatch = aMatches[len(aMatches) - 1];
-				aLastMatchIndices = aMatchIndices[len(aMatchIndices) - 1];
-				if -1 != aPreviousLastMatchIndices[0] && aLastMatchIndices[0] != aPreviousLastMatchIndices[0] {
-					bOutputPrevious = true;
-				}
-			}
-			
-		} else {
-			
-			bOutputPrevious = true;
-			
-		}
-		
-		//base.Dump(aLastMatch);
-		//base.Dump(aLastMatchIndices);
-		//base.Dump(bOutputPrevious);
-		
-		if (-1 != aPreviousLastMatchIndices[0] && bOutputPrevious) {
-			aMatch := aPreviousLastMatch;
-			sOutput := sOutputTemplate;
-			for iNr , sValue := range aMatch {
-				sOutput = strings.Replace(sOutput, "\\" + strconv.Itoa(iNr), sValue, -1);
-			}
-			if !bCount {
-				if bReplace {
-					fmt.Print(oRegExA.ReplaceAllLiteralString(sPart, sOutput));
-				} else {
-					fmt.Print(sOutput + "\n");
-				}
-			}
-base.Dump(aPreviousLastMatchIndices[1]);
-base.Dump(sPart);
-			sPart = sPart[aPreviousLastMatchIndices[1]:];
-			aPreviousLastMatchIndices[0] = -1;
-			aPreviousLastMatch = []string{};
-			iCount ++;
-		}
-		
-		if (len(aLastMatch) > 0) {
-			aPreviousLastMatchIndices = aLastMatchIndices;
-			aPreviousLastMatch = aLastMatch;
-		}
-		
-		if e != nil { break; }
-		*/
 		
 	}
 	
