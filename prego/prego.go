@@ -54,15 +54,18 @@ func main () {
 	
 	sRegExp := aArgs[""][0];
 	oRegExA := regexp.MustCompile(sRegExp);
+	bStartPattern := regexp.MustCompile("^\\^").MatchString(sRegExp);
+	bEndPattern := regexp.MustCompile("\\$$").MatchString(sRegExp);
 	
 	sOutputTemplate := "\\0";
 	if len(aArgs[""]) > 1 {
 		sOutputTemplate = aArgs[""][1];
 	}
 	
+	sPart := "";
 	iRead := 0;
 	iCount := 0;
-	sPart := "";
+	iPartOffset := 0;
 	aNewLetter := make([]byte, 1);
 	var e error;
 	
@@ -81,25 +84,25 @@ func main () {
 			
 			aLastMatch := aMatches[len(aMatches) - 1];
 			aLastMatchIndices := aMatchIndices[len(aMatchIndices) - 1];
-			
 			aMatchIndicesNext := oRegExA.FindAllStringSubmatchIndex(sPart + sNewLetter, -1);
 			
 			bOutput := true;
-			
 			if e == nil {
-				
 				if len(aMatchIndicesNext) > 0 {
-					
 					aLastMatchIndicesNext := aMatchIndicesNext[len(aMatchIndicesNext) - 1];
-					
 					if aLastMatchIndices[0] == aLastMatchIndicesNext[0] && aLastMatchIndices[1] != aLastMatchIndicesNext[1] {
-						
 						bOutput = false;
-						
 					}
-					
 				}
-				
+			}
+			
+			if bOutput {
+				if bStartPattern && iPartOffset + aLastMatchIndices[0] != 0 {
+					bOutput = false;
+				}
+				if bEndPattern && e == nil {
+					bOutput = false;
+				}
 			}
 			
 			if (bOutput) {
@@ -115,6 +118,7 @@ func main () {
 					fmt.Print(sOutput + "\n");
 				}
 				sPart = sPart[(aLastMatchIndices[1]):];
+				iPartOffset += aLastMatchIndices[1] + 1;
 			}
 			
 		}
