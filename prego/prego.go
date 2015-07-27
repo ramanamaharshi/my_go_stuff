@@ -41,6 +41,8 @@ func main () {
 	_ , bReplace := aArgs["r replace"];
 	_ , bCount := aArgs["c count"];
 	
+	bHelp = (bHelp || (0 == len(aArgs)));
+	
 	if bHelp {
 		fmt.Println("this tool is for grepping when there are no line breaks");
 		fmt.Println("usage: streamo [regular expression] <[output template (default='\\0')]>");
@@ -50,6 +52,7 @@ func main () {
 		fmt.Println("-c --count : only count matches, print count");
 		fmt.Println("planned options:");
 		fmt.Println("-p --plain : search for string instead of regular expression");
+		return;
 	}
 	
 	sRegExp := aArgs[""][0];
